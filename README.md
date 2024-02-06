@@ -2,7 +2,9 @@
   - [安装环境](#安装环境)
     - [虚拟机配置](#虚拟机配置)
     - [Ubuntu 系统配置](#ubuntu-系统配置)
+  - [编译 DPDK](#编译-dpdk)
   - [内存布局](#内存布局)
+
 
 # DPDK
 
@@ -55,7 +57,7 @@
   sudo bash -c 'echo igb_uio >> /etc/modules'
   ```
 
-  
+
 
 * 禁用 DPDK 测试网卡的 DHCP
 
@@ -82,7 +84,7 @@
   sudo netplan apply
   ```
 
-  
+
 
 * 设置大页
 
@@ -113,7 +115,7 @@
   reboot
   ```
 
-  
+
 
 * 检测驱动和大页
 
@@ -128,6 +130,82 @@
   ```bash
   cat /proc/meminfo | grep HugePages
   ```
+
+
+
+## 编译 DPDK
+
+* 下载 DPDK 源码
+
+  - https://fast.dpdk.org/rel/dpdk-22.11.4.tar.xz
+
+  ```bash
+  wget https://fast.dpdk.org/rel/dpdk-22.11.4.tar.xz
+  ```
+
+
+
+* 安装依赖
+
+  ```bash
+  sudo apt install \
+    meson \
+    ninja-build \
+    gdb \
+    gcc \
+    pkg-config \
+    python3-pyelftools \
+    libpcap-dev \
+    libnuma-dev \
+    libbsd-dev \
+    libssl-dev \
+    libjansson-dev \
+    libarchive-dev \
+    doxygen \
+    libcrypt-dev \
+    cmake \
+    zlib1g-dev \
+    libelf-dev \
+    libbpf-dev
+  ```
+
+
+
+* 编译 & 安装
+
+  ```bash
+  tar xf dpdk-22.11.4.tar.xz
+  cd dpdk-stable-22.11.4
+  meson build --buildtype=debug
+  ninja -C build install
+  ```
+
+  > * 通过 `meson confiugre build` 可以查看配置
+  > * 编译为 Debug 版本，便于后面调试分析
+
+* 测试
+
+  * 编写一个简单的测试代码 `test-dpdk.c`
+
+    ```c
+    #include <rte_eal.h>
+    
+    int main(int argc, char ** argv) {
+        int err = rte_eal_init(argc, argv);
+        if (err < 0) {
+            return -1;
+        }
+    
+        return 0;
+    }
+    ```
+
+  * 编译 & 运行
+
+    ```bash
+    gcc -g test-dpdk.c -lrte_eal
+    ./a.out
+    ```
 
 
 
