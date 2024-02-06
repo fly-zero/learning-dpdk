@@ -1,10 +1,139 @@
+- [DPDK](#dpdk)
+  - [安装环境](#安装环境)
+    - [虚拟机配置](#虚拟机配置)
+    - [Ubuntu 系统配置](#ubuntu-系统配置)
+  - [内存布局](#内存布局)
+
 # DPDK
 
 本项目是对 DPDK 的源码的分析笔记。基于 dpdk 22.11.4 版本。
 
+
+
+## 安装环境
+
+
+
+### 虚拟机配置
+
+* 使用 VMware 创建虚拟机
+
+  > 虚拟机创建后默认有一张网卡，该网卡用于组网，SSH 访问。还需要额外添加两张网卡，用于运行 DPDK。
+
+* 修改网卡驱动
+
+  * 打开虚拟机所在目录
+
+    ![](assets/open-vmware-dir.png)
+
+  * 使用记事本编辑 `.vmx` 后缀的文件，修改以下两项
+
+    ```text
+    ethernet1.virtualDev = "vmxnet3"
+    ethernet1.vwakeOnPcktRcv = "TRUE"
+    ethernet2.virtualDev = "vmxnet3"
+    ethernet2.vwakeOnPcktRcv = "TRUE"
+    ```
+
+    > VMware 配置中的网卡是从 0 开始编号的。
+
+
+
+### Ubuntu 系统配置
+
+* 安装 `igb_uio` 驱动
+
+  ```bash
+  sudo apt install dpdk-kmods-dkms
+  ```
+
+  > 这里选择从 ubuntu 软件源下载 `igb_uio` 驱动。如果系统是 UEFI 安全启动，自己编译驱动需要进行签名、部署、设置 MOK 等操作，后面介绍如何编译 `igb_uio`。
+
+  将 `igb_uio` 设置为启动时自动加载
+
+  ```bash
+  sudo bash -c 'echo igb_uio >> /etc/modules'
+  ```
+
+  
+
+* 禁用 DPDK 测试网卡的 DHCP
+
+  测试网卡在 ubuntu 上启用了 DHCP，做为组网网卡用了，DPDK 无法绑定存在于路由表中的网卡。ubuntu 22.04 使用 `netplat` 管网络，修改 `netplan` 配置文件 `/etc/netplan/00-installer-config.yaml`
+
+  ```yaml
+  # This is the network config written by 'subiquity'
+  network:
+    ethernets:
+      ens160:
+        dhcp4: false
+      ens192:
+        dhcp4: false
+      ens33:
+        dhcp4: true
+    version: 2
+  ```
+
+  > 注意缩进。网卡名按实际情况确定。
+
+  重置网络
+
+  ```bash
+  sudo netplan apply
+  ```
+
+  
+
+* 设置大页
+
+  DPDK 需要一定数量大页内存，系统默认开启了 2MB 的大页，通过以下方法可以临时分配大页：
+
+  ```bash
+  sudo bash -c 'echo 512 >/sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages'
+  ```
+
+  > 分配了 512 * 2MB 的大页
+
+  也可以设置启动时自动预留大页，修改 `/etc/default/grub` 文件中 `GRUB_CMDLINE_LINUX_DEFAULT` 的值
+
+  ```txt
+  GRUB_CMDLINE_LINUX_DEFAULT="default_hugepagesz=1G hugepagesz=1G hugepages=2"
+  ```
+
+  > 参数说明：
+  >
+  > * `default_hugepagesz=1G` 设置默认大页为 1GB
+  > * `hugepagesz=1G` 开启 1GB 大页
+  > * `hugepages=2` 在启动时预留两个大页
+
+  更新 grub 配置，并重启
+
+  ```bash
+  sudo update-grub
+  reboot
+  ```
+
+  
+
+* 检测驱动和大页
+
+  重启后检查 `igb_uio` 驱动是否自动加载
+
+  ```bash
+  lsmode | grep igb_uio
+  ```
+
+  检查大页
+
+  ```bash
+  cat /proc/meminfo | grep HugePages
+  ```
+
+
+
 ## 内存布局
 
-DPDK 初始化之后内存布局如下：
+内存布局就是地图，有了地图才能按图索骥。DPDK 初始化函数是 `rte_eal_init()`，完成初始化之后内存布局如下：
 
 ![](assets/dpdk-memory-layout.svg)
 
