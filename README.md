@@ -241,7 +241,7 @@
 ### heap
 
 * **heap 的成员**
-  * `malloc_heaps[]` 数组的长度默认是 `RTE_MAX_HEAPS`，进程按运行时所在 NUMA 结点选择对应的 heap
+  * `malloc_heaps[]` 数组的长度默认是 `RTE_MAX_HEAPS`，线程按运行时所在 NUMA 结点选择对应的 heap
   * `malloc_heaps[i].name[]` 保存着 heap 的名称，以 NUMA ID 命名
   * `malloc_heaps[i].socket_id` 实际是 NUMA ID
 
@@ -257,7 +257,7 @@
 
   * 添加大页到 heap 中
 
-    大页内存在分配之后，在大页内存开始地址处构造一个 `malloc_elem` 对象，添加到对应 NUMA 所在的 `malloc_heaps[]` 中。
+    大页分配之后，在大页内存开始地址处构造一个 `malloc_elem` 对象，添加到对应 NUMA 所在的 `malloc_heaps[]` 中。
 
     ![](assets/heap-expand.svg)
 
@@ -275,7 +275,7 @@
 
       > 分配1GB 大页后，将被添加到 `free_head[11]` 中
 
-    * `heap[i].first` 的 `heap[i].last` 是连接该 heap 下所有内存块（包括已分配和未分配）的链表头和尾，并且是按地址顺序排列。
+    * `heap[i].first` 和 `heap[i].last` 用于连接该 heap 下所有内存块（包括已分配和未分配）的链表头和尾，并且链表是按地址顺序排列。
 
   
 
@@ -289,7 +289,7 @@
 
     * `malloc_elem` 头部，即 `sizeof (struct malloc_elem)`
     * `MIN_DATA_SIZE`，是一个 Cache Line 大小
-    * `MALLOC_ELEM_TRAILER_LEN`，通常是 0，如果打开了内存检测宏 `RTE_MALLOC_ASAN`，则一个 Cache Line 大小
+    * `MALLOC_ELEM_TRAILER_LEN`，通常是 0，如果打开了内存检测宏 `RTE_MALLOC_ASAN`，则是一个 Cache Line 大小
 
     根据分裂检查结果执行：
 
