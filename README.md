@@ -326,3 +326,4 @@
 
 ### mempool
 
+![](assets/mempool_layout.svg)
