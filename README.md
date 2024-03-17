@@ -324,9 +324,22 @@
 
 
 
-### memzone
+### fbarray
 
 TODO
+
+
+
+### memzone
+
+![](assets/memzone.svg)
+
+`heap` 是匿名的内块，而 `memzone`  是命名的 `heap` 内存块，通过名称可以跨进程查找。`memzone` 是由 `rte_memzone` 类型对象构成的 `rte_fbarray` 对象池。分配 `memezone` 的流程如下：
+
+* 从 `rte_fbarray` 对象池中分配一个 `rte_memzone` 对象（参考 `fbarray`）
+* 从 `heap` 上分配参数指定大小的内存块
+* 内存块地址保存到 `rte_memzone.addr`
+* `rte_memzone.name` 保存 `memzone` 的名称，该名称可用于查找
 
 
 
