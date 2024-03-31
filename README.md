@@ -189,6 +189,8 @@
   > * 通过 `meson confiugre build` 可以查看配置
   > * 编译为 Debug 版本，便于后面调试分析
 
+
+
 * 测试
 
   * 编写一个简单的测试代码 `test-dpdk.c`
@@ -350,31 +352,31 @@ TODO
 
 ![](assets/mempool_layout.svg)
 
-创建 `mempool` 对象的流程：
+* **`mempool` 的创建**
 
-* 在 `heap` 上分配 `struct rte_tailq_entry` 类型的对象，即上图中的 `te` 内存块，`te.data` 成员保存着 `mempool` 对象的指针。因此，通过 `mem_cfg.tailq_head[].name` 找到值为 `"RTE_MEMPOOL"`的链表，遍历所有 `te` 即可找到所有的 `mempool` 对象。
-* 计算 `mempool` 对象的大小，`mempool` 对象的内存由以下几部分组成：
-  * `struct rte_mempool` 对象
-  * 如果 `cache_size` 参数不为零，则包含 `RTE_MAX_LCORE` 个 `struct rte_mempool_cache` 对象
-  * 如果 `private_data_size` 参数不为零，则包含 `private_data_size` 大小的预留空间
-  * 对齐到 Cache Line 后产生的内存空洞
-* 在 `memzone` 上分配 `mempool` 对象的内存（参考 `memzone` 章节）
-* 设置 `mempool` 的各字段：`memzone` 的地址，对象数量，对象大小，缓存大小，私有数据大小等等
-* 设置 `mempool` 的操作函数集合，`mempool` 是将池中的对象指针保存在 `ring` 中，通过 `ring` 的出队，入队操作来完成分配（出队）和释放（入队）。根据创建 `mempool` 时的参数，有以下几种操作函数集合：
-  * `ring_sp_sc`：单生产者（释放）、单消费者（分配）
-  * `ring_sp_mc`：单生产者（释放）、多消费者（分配）
-  * `ring_mp_sc`：多生产者（释放）、单消费者（分配）
-  * `ring_mp_mc`：多生产者（释放）、多消费者（分配）
+  * 在 `heap` 上分配 `struct rte_tailq_entry` 类型的对象，即上图中的 `te` 内存块，`te.data` 成员保存着 `mempool` 对象的指针。因此，通过 `mem_cfg.tailq_head[].name` 找到值为 `"RTE_MEMPOOL"`的链表，遍历所有 `te` 即可找到所有的 `mempool` 对象。
+  * 计算 `mempool` 对象的大小，`mempool` 对象的内存由以下几部分组成：
+    * `struct rte_mempool` 结构
+    * 如果 `cache_size` 参数不为零，则包含 `RTE_MAX_LCORE` 个 `struct rte_mempool_cache` 对象
+    * 如果 `private_data_size` 参数不为零，则包含 `private_data_size` 大小的预留空间
+    * 对齐到 Cache Line 后产生的内存空洞
+  * 在 `memzone` 上分配 `mempool` 对象的内存（参考 `memzone` 章节）
+  * 设置 `mempool` 的各字段：`memzone` 的地址，对象数量，对象大小，缓存大小，私有数据大小等等
+  * 设置 `mempool` 的操作函数集合，`mempool` 是将池中的对象指针保存在 `ring` 中，通过 `ring` 的出队，入队操作来完成分配（出队）和释放（入队）。根据创建 `mempool` 时的参数，有以下几种操作函数集合：
+    * `ring_sp_sc`：单生产者（释放）、单消费者（分配）
+    * `ring_sp_mc`：单生产者（释放）、多消费者（分配）
+    * `ring_mp_sc`：多生产者（释放）、单消费者（分配）
+    * `ring_mp_mc`：多生产者（释放）、多消费者（分配）
 
-> `rte_tailq_elem_head` 链表中的各个结点是声明在各模块中的静态全局变量，通过 `__attribute__((constructor))` 属性的函数，在模块加载时将结点挂接到 `rte_tailq_elem_head` 中。`rte_tailq_elem_head` 的每一个结点的代表一类资源，通过结点的 `head` 成员指向 `mem_cfg.tailq_head[]` 中的一项元素，`mem_cfg.tailq_head[]` 是各类资源对象的链表组成的数组。`head` 指向 `mem_cfg.tailq_head[]` 的关联过程是在 `rte_eal_init() -> rte_eal_tailqs_init()` 过程中完成的：
->
-> * 若为 `primary` 进程：
->   * 则从 `mem_cfg.tailq_head[]` 中分配一项
->   * 设该类资源链表的名称： `rte_tailq_elem.name` 复制到 `rte_tailq_head.name`
->   * 设置 `rte_tailq_elem.head` 为分配的 `rte_tailq_head`
-> * 若为 `secondary` 进程：
->   * 找到 `rte_tailq_elem` 和 `mem_cfg.tailq_head[]` 中有相同名称的项
->   * 设置 `rte_tailq_elem.head` 为分配的 `rte_tailq_head`
+  > `rte_tailq_elem_head` 链表中的各个结点是声明在各模块中的静态全局变量，通过 `__attribute__((constructor))` 属性的函数，在模块加载时将结点挂接到 `rte_tailq_elem_head` 中。`rte_tailq_elem_head` 的每一个结点的代表一类资源，通过结点的 `head` 成员指向 `mem_cfg.tailq_head[]` 中的一项元素，`mem_cfg.tailq_head[]` 是各类资源对象的链表组成的数组。`head` 指向 `mem_cfg.tailq_head[]` 的关联过程是在 `rte_eal_init() -> rte_eal_tailqs_init()` 过程中完成的：
+  >
+  > * 若为 `primary` 进程：
+  >   * 则从 `mem_cfg.tailq_head[]` 中分配一项
+  >   * 设该类资源链表的名称： `rte_tailq_elem.name` 复制到 `rte_tailq_head.name`
+  >   * 设置 `rte_tailq_elem.head` 为分配的 `rte_tailq_head`
+  > * 若为 `secondary` 进程：
+  >   * 找到 `rte_tailq_elem` 和 `mem_cfg.tailq_head[]` 中有相同名称的项
+  >   * 设置 `rte_tailq_elem.head` 为分配的 `rte_tailq_head`
 
 
 
