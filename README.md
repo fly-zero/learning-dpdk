@@ -392,6 +392,34 @@ TODO
 
 
 
-从 `mempool` 中分配对象的流程：
+* **从 `mempool` 中分配对象**
 
-TODO
+  * 分配对象时，优先尝试从当前线程所在 CPU 核心的缓存中分配，即 `cache[rte_lcore_id()]`，该缓存是 `struct rte_mempool_cache` 类型，对该缓存的操作是线程不安全的，但由于 `dpdk` 是绑核运行，每个核心上只运行一个固定的线程，因此并不会产生竞争问题。
+
+    * `struct rte_mempool_cache` 内部包含：
+
+      * `objs[]`：对象指针缓存数组，大小为 `RTE_MEMPOOL_CACHE_MAX_SIZE * 2`。该数组用于保存当前 CPU 线程上释放的的对象指针，分配对象时优先从该缓存中获取
+
+      * `size`：对象缓存数组的大小，`size` 是小于 `szieof objs` 的，该大小是创建 `mempool` 时指定的 `cache_size`
+
+        > 创建 `mempool` 时会检测 `cache_size` 大小，超时 `RTE_MEMPOOL_CACHE_MAX_SIZE` 时认为是非法值
+
+      * `flushthresh`：刷新阈值，默认是 1.5 倍 `size`，当缓存中的对象数量超过该值时，将 `objs[]` 中的对象还到 `mempool` 的 `ring` 中
+
+        > 创建 `mempool` 时会检测默认的阈值大小，阈值大小超过 `mempool` 中总对象大小时，认为是非法值。因为该情况会造成某个线程缓存了所有对象，其它线程无法获取到对象的问题。
+
+      * `len`：当前的缓存数组中对象的数量
+
+  * 若 `cache` 中有足够的对象，则从 `objs[]` 数据尾部弹出对象指针即可
+
+  * 若 `cache` 中没有足够的对象，则从 `ring` 中分配 `cache.size + (n - cache.len)` 个，即从 `cache` 中获取一部分对象，再从 `ring` 获取另一部分对象，并且还额外分配了 `cache.size` 个对象来填充 `cache.objs[]`
+
+  * 若从 `mempool` 中分配的对象数量满足 `(n - cache.len) > RTE_MEMPOOL_CACHE_MAX_SIZE` 时，缓存中无法放下这么多对象，则直接从 `ring` 中分配
+
+
+
+* **释放从 mempool 中分配的对象**
+  * 若释放 `n` 个对象，且 `n` 超过了 `cache.flushthresh`，则直接还到 `ring` 中
+  * 若释放 `n` 个对象，且 `(n + cache.len) <= cache.flushthresh`，则将对象指针缓存到当前 CPU 的 `cache.objs[]` 中
+  * 若释放 `n` 个对象，且 `(n + cache.len) > cache.flushthresh`，则将 `cache.objs[]` 中对象还给 `ring`，将要释放的 `n` 个对象缓存到 `cache.objs[]` 中
+
