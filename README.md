@@ -4,7 +4,7 @@
     - [Ubuntu 系统配置](#ubuntu-系统配置)
   - [编译 DPDK](#编译-dpdk)
   - [内存布局](#内存布局)
-  - [内存分配](#内存分配)
+  - [内存管理](#内存管理)
     - [heap](#heap)
     - [fbarray](#fbarray)
     - [memzone](#memzone)
@@ -241,7 +241,7 @@
 
 
 
-## 内存分配
+## 内存管理
 
 ### heap
 
