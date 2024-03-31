@@ -331,7 +331,30 @@
 
 ### fbarray
 
-TODO
+![](assets/fbarray.svg)
+
+`fb_array` （Flat Buffer Array）是一个通用的对象池，与 [`mempool`](#mempool) 类似。`fb_array` 通过位图来标记元素是否空闲，`rb_array` 不提供一个比较方便快捷的分配和释放函数，需要调用 `fb_array` 的一系列操作函数来完成分配释放工作；另外，`fb_array` 对象池中的对象不是位于大页上的。
+
+* **`fb_array` 的初始化**
+
+  初始化工作通过调用 `rte_fbarray_init()` 函数来完成：
+
+  * 计算对象池所需内存大小，使用系统默认页大小（在 x86 平台上为 4 KB）在 `dpdk` 共享内存空间上预定地址范围
+  * 创建 `fb_array` 共享内存文件映射，文件默认路径为 `/var/run/dpdk/rte/fbarray_xxx`，其中 `xxx` 为传递给初始化函数的 `name` 参数。从这里可以看出 `fb_array` 不是在 `hugetlbfs` 下创建的文件，因此对象池不在大页上。
+  * 在进程的私有内存空间上使用 `malloc` 分配 `struct mem_area` 结构，用于保存共享内存文件映射的地址、长度、文件描述符等，并串接到静态全局链表 `mem_area_tailq` 的尾部
+  * 设置 `fb_array` 内存开始位置，长度等成员
+
+
+
+* **从 `fb_array` 中分配内存**
+  * 通过查询对象数组末尾的 `mask` 位图找到空闲对象（`rte_fbarray_find_next_free()`）
+  * 通过设置对象数组末尾的 `mask` 位图来标记对象为已使用（`rte_fbarray_set_used()`）
+  * `fb_array` 的操作函数是线程安全的，但是分配对象的过程被分成多个 API 函数，在找到空闲的对象时，有可能另一个线程将其设置为 `used` 状态，导致标记对象失败，因此调用者需要自己额外再实现一个锁机制来避免该问题。
+
+
+
+* **释放从 `fb_array` 中分配的对象**
+  * 通过设置对象数组末尾的 `mask` 位图来标记对象为未使用（`rte_fbarray_set_free()`）
 
 
 
