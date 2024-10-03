@@ -9,6 +9,9 @@
     - [fbarray](#fbarray)
     - [memzone](#memzone)
     - [mempool](#mempool)
+  - [PMD](#PMD)
+    - [PMD 加载](#PMD-加载)
+    - [PMD 与网卡的匹配](#PMD-与网卡的匹配)
 
 
 
@@ -445,4 +448,27 @@
   * 若释放 `n` 个对象，且 `n` 超过了 `cache.flushthresh`，则直接还到 `ring` 中
   * 若释放 `n` 个对象，且 `(n + cache.len) <= cache.flushthresh`，则将对象指针缓存到当前 CPU 的 `cache.objs[]` 中
   * 若释放 `n` 个对象，且 `(n + cache.len) > cache.flushthresh`，则将 `cache.objs[]` 中对象还给 `ring`，将要释放的 `n` 个对象缓存到 `cache.objs[]` 中
+
+
+
+## PMD
+
+### PMD 加载
+
+当 DPDK 以动态库方式编译时，它需要能找库所在位置。在 DPDK 中使用 `solib_list` 来管理 PMD 动态库。
+
+![](assets/pmd-solist.svg)
+
+`solib_list` 是一个静态全局变量，它是一个由 PMD 动态库目录和 PMD 动态库组成的链表。链表中的元素是 `struct shared_driver` 类型，它纪录了路径（`name`）和 `dlopen` 打开的句柄（`lib_handle`）。`solib_list` 的第一个元素是一个目录，它的句柄是空的。
+
+* `solib_list` 初始化过程：
+  * 在 `rte_eal_init` 函数中调用了 `eal_plugins_init` 进入 `solib_list` 初始化流程
+  * 检测 DPDK 是否以动态库方式编译，在动态库的情况时，将 PMD 所在目录添加到 `solib_list` 中
+  * 遍历 `solib_list` 中的每个 `solib` 项：
+    * 若 `stat` 检测到路径（`name`） 为目录，则调用 `eal_plugindir_init` 遍历目录中所有的以 `so` 或者 `so.<version>` 结尾的动态库文件，并它们追加到 `solib_list` 的结尾
+    * 若 `stat` 检测到路径（`name`）为普通文件，则调用 `dlopen` 打开动态库，并设置动态库的句柄（`lib_handle`）
+
+
+
+### PMD 与网卡的匹配
 
