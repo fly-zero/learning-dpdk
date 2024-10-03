@@ -11,7 +11,7 @@
     - [mempool](#mempool)
   - [PMD](#PMD)
     - [PMD 加载](#PMD-加载)
-    - [PMD 与网卡的匹配](#PMD-与网卡的匹配)
+    - [PMD 注册](#PMD-注册)
 
 
 
@@ -470,5 +470,12 @@
 
 
 
-### PMD 与网卡的匹配
+### PMD 注册
 
+PMD 注册是指将描述网卡信息（`class_id`、`vender_id`、`device_id`等）和操作函数（`probe`、`revomve`）的全局变量连接到驱动链表中的过程。在 DPDK 的各类网卡 PMD 代码中通常使用 `RTE_PMD_REGISTER_PCI` 来注册 PMD 。`RTE_PMD_REGISTER_PCI` 宏声明了一个 `__attribute__((constructor))` 属性的函数，该函数在模块加载时自动运行（动态库是 `dlopen` 过程中触发，可执行文件是加载器加载过程中触发），该函数内部调用了 `rte_pci_register` 函数来注册 PMD。
+
+![](assets/pmd-driver-list.svg)
+
+* `rte_pci_bus.bus` 是总线操作函数和链表钩子组成的结构，操作函数包含`scan`、`probe`、`cleanup`、`find_device` 等；链表钩子用于将多种总线类型串起来，DPDK 支持多种总线类型，网卡通常为 PCI 总线设备。
+* `rte_pci_bus.device_list` 是 DPDK 在 `rte_bus_scan` 函数中，通过调用总线链表中各总线的 `scan` 操作函数扫描到的设备描述列表。
+* `rte_pci_bus.drive_list` 就是各 PMD 注册时串接进来的 PMD 描述对象。
